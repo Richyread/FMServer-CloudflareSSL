@@ -58,18 +58,27 @@ PROMPT=1                                    # Set to 1 to get user prompts for s
 RESTART_SERVER=1                            # [WARNING]: If set to 1, will automatically restart server, without warning.
 MAX_WAIT_AMOUNT=6                           # Used to determine max wait time for server to stop: time =  MAX_WAIT_AMOUNT * 10 seconds
 
+#============================================
 # Certbot Parameters
+#============================================
 DOMAIN="sample_domain.com"                  # Domain used to generate the certificate. When using multiple domains, separate them
                                             # with a comma. ie: sample_domain1.com,sample_domain2.com
 
 EMAIL="sample_email@email.com"              # Email used to generate the certificate, will recieve reminders from Let's Encrypt
                                             # when the certificate generated is about to expire.
 
+CFAPI_PATH=~/.secrets/certbot/cloudflare.ini #location of file storing the cloudflare API token from your account
 TEST_CERTIFICATE=1                          # Set to 1, this will not use up a request and can be used as a dry-run to test. If 
                                             # Set to 0, the command will be run and will use up a certificate request.
 UPDATE_EXISTING_CERT=1                      # Set if trying to update an existing cert, ie: adding an additional domain.
 
 SECONDARY_MACHINE=0							# Set to 0, this script is being run on FileMaker Server Primary Machine, if 1: Secondary Machine
+
+#============================================
+#FMS Parameters
+#============================================
+FAC_USERNAME=usersomething
+FAC_PASSWORD=passwordhere
 
 # FileMaker Admin Console Login Information
 if [ $PROMPT == 0 ] ; then
@@ -182,20 +191,20 @@ fi
 
 # Ubuntu ONLY: Allow incoming connections into ufw
 # Do not add unnecessary lines from here to the restarting ufw. 
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    service ufw stop
-fi
+#if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+#    service ufw stop
+#fi
 
 # Run the certbot certificate generation command
-certbot certonly --webroot$TEST_CERT_PARAM -w "$WEBROOTPATH" --preferred-challenges http $DOMAINLIST--agree-tos --non-interactive -m $EMAIL --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"$EXPAND_PARAM
+sudo -E certbot certonly --dns-cloudflare --dnscloudflare-credentials "$CFAPI_PATH" $TEST_CERT_PARAM $DOMAINLIST --agree-tos --non-interactive -m $EMAIL --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"$EXPAND_PARAM
 
 # Capture return code for running certbot command
 RETVAL=$?
 
 # Ubuntu ONLY: Restart ufw firewall
-if [[ "$OSTYPE" == "linux-gnu"* ]] ; then
-    service ufw start
-fi
+#if [[ "$OSTYPE" == "linux-gnu"* ]] ; then
+#    service ufw start
+#fi
 
 if [ $RETVAL != 0 ] ; then
     err "[ERROR]: Certbot returned with a nonzero failure code. Check $CERTBOTPATH/letsencrypt.log for more information."
