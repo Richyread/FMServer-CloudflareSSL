@@ -15,3 +15,11 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 3. Enable the scripts to be executable by using command [sudo chmod +x {name of script}]
 4. Edit the cloudflare.ini file by pasting in the Cloudflare API key.
 5. Adjust permissions on the cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
+6. Edit the sctipt [fm_request_cert.sh] to provide the following details:
+   A] {Line 64} Add FQDN to be used for requested certificate
+   B] {Line 67} Add valid email address to receive alerts and assign requests against
+   C] {Line 71} Set value =1 for Testing and value =0 for Production certificate
+   D] {Line 80} Add valid server Admin Console user account to allow for certificate upload
+   E] {Line 81} Add valid server Admin Console user password to allow for certificate upload
+7. Save changes and run the updated script by using the command [./fm_request_cert.sh] and entering the sudo password when requested.
+8. Depending on the value set on {Line 71} you should recieve either a "Testing successful" or a "Certificate Produced" message on completion. Process takes about 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
