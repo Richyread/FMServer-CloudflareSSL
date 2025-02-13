@@ -54,7 +54,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 fi
 
-PROMPT=1                                    # Set to 1 to get user prompts for script variables.
+PROMPT=0                                    # Set to 1 to get user prompts for script variables.
 RESTART_SERVER=1                            # [WARNING]: If set to 1, will automatically restart server, without warning.
 MAX_WAIT_AMOUNT=6                           # Used to determine max wait time for server to stop: time =  MAX_WAIT_AMOUNT * 10 seconds
 
