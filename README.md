@@ -7,3 +7,11 @@ Scripts modified from source provided by Claris as part of the standard installa
 Primary modifications are to enable request & renewal of certificates via 'DNS-challenge' rather than the 'HTTP-challenge' which is currently the default (and only) option.
 
 Whilst the changes are for Cloudflare specific dns-challenges, similar steps could be followed to substitue in any of the other providers etc. View the Certbot main documentation for DNS Plugins and subsequent tweaks required for each specific dns provider. In the example of Cloudflare you need to obtain an API key from your account and pass this through to the script via an 'cloudflare.ini' file.
+
+## Steps to Generate SSL Certificates On A New Server ##
+
+1. Create a working directory underneath the defualt 'home' directory on Ubuntu Sever. E.g. ~./certbot
+2. Clone this repository into this new directory so as to have copies of the modified scripts on the target machine.
+3. Enable the scripts to be executable by using command [sudo chmod +x {name of script}]
+4. Edit the cloudflare.ini file by pasting in the Cloudflare API key.
+5. Adjust permissions on the cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
