@@ -8,4 +8,8 @@ sudo ln -s /snap/bin/certbot /usr/bin/certbot
 sudo snap set certbot trust-plugin-with-root=ok
 sudo snap install certbot-dns-cloudflare
 
+cd /
+mkdir -p ~/.secrets/certbot/
+touch ~/.secrets/certbot/cloudflare.ini
+
 exit 0
