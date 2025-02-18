@@ -28,7 +28,11 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 
 
 ****Some tips/error resolutions***
+  
+- Enable the scripts to be executable by using command [sudo chmod +x {name of script}]
 
-Enable the scripts to be executable by using command [sudo chmod +x {name of script}]
-Change ownership of files by using [sudo chown user:group {name of file/directory}]
-Change file priveleges to owner only [sudo chmod 700 {file/directory}] and to read/write for all users [sudo chmod 755 {file/directory}
+- Change ownership of files by using [sudo chown user:group {name of file/directory}]
+
+- Change file priveleges to owner only [sudo chmod 700 {file/directory}]
+
+- Change file privelges to read/write for all users [sudo chmod 755 {file/directory}]
