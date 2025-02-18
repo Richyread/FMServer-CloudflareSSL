@@ -196,7 +196,7 @@ fi
 #fi
 
 # Run the certbot certificate generation command
-sudo -E certbot certonly --dns-cloudflare --dnscloudflare-credentials "$CFAPI_PATH" $TEST_CERT_PARAM $DOMAINLIST --agree-tos --non-interactive -m $EMAIL --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"$EXPAND_PARAM
+sudo -E certbot certonly --dns-cloudflare --dns-cloudflare-credentials "$CFAPI_PATH" $TEST_CERT_PARAM $DOMAINLIST --agree-tos --non-interactive -m $EMAIL --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"$EXPAND_PARAM
 
 # Capture return code for running certbot command
 RETVAL=$?
