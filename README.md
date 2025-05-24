@@ -8,9 +8,9 @@ Primary modifications are to enable request & renewal of certificates via 'DNS-0
 
 Whilst the changes are for Cloudflare specific dns-challenges, similar steps could be followed to substitue in any of the other providers etc. View the Certbot main documentation for DNS Plugins and subsequent tweaks required for each specific dns provider. In the example of Cloudflare you need to obtain an API key from your account and pass this through to the script via an 'cloudflare.ini' file.
 
-## Steps to Generate SSL Certificates On A New Server ##
+# Steps to Generate SSL Certificates On A New Server #
 
-# Initital setup and Cloudflare API key #
+## Initital setup and Cloudflare API key ##
 
 Copy the commands from [Initial_setup.sh] onto target machine to install Certbot and supporting files
 
@@ -18,7 +18,7 @@ Edit the generated empty cloudflare.ini file by pasting in a valid Cloudflare AP
 
 Adjust permissions on the updated cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
 
-# Generate .env file & populate variables #
+## Generate .env file & populate variables ##
 
 Run the following commands to:
  - Navigate to the LetsEncrypt directory
@@ -33,7 +33,7 @@ Go through the .env and adjust the variables for the target machine as required.
 
 Once editing is completed, ensure you change the permissions on the .env file to restrict access using command [sudo chmod 600 .env]
 
-# Remove existing 'HTTPS-01' default scripts & recreate #
+## Remove existing 'HTTPS-01' default scripts & recreate ##
 
 Use the commands below command to:
   - remove the two default installed 'HTTPS-01' challenge scripts
@@ -46,7 +46,7 @@ sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-Clou
     
 [sudo chown fmserver:fmsadmin fm_{request,renew}_cert.sh && sudo chmod 755 fm_{request,renew}_cert.sh]
     
-# Generate a certificate
+## Generate a certificate ##
 
 Run the request script once on each new machine to:
  - Create a certificate store on the machine
