@@ -21,9 +21,9 @@ Adjust permissions on the updated cloudflare.ini file using command [chmod 600 ~
 # Generate .env file & populate variables #
 
 Run the following commands to:
-> Navigate to the LetsEncrypt directory
-> Download the example_env.md template and save it as '.env' file
-> Set temporary permissions for easy editing
+ - Navigate to the LetsEncrypt directory
+ - Download the example_env.md template and save it as '.env' file
+ - Set temporary permissions for easy editing
 
 [cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
 sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/example_env.md -o .env && \
@@ -36,9 +36,9 @@ Once editing is completed, ensure you change the permissions on the .env file to
 # Remove existing 'HTTPS-01' default scripts & recreate #
 
 Use the commands below command to:
-  > remove the two default installed 'HTTPS-01' challenge scripts.
-  > download the revised 'DNS-01' challenge scripts from github repo
-  > set correct ownership and permissions
+  - remove the two default installed 'HTTPS-01' challenge scripts
+  - download the revised 'DNS-01' challenge scripts from github repo
+  - set correct ownership and permissions
 
 [sudo rm -f fm_{request,renew}_cert.sh && \
 sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
@@ -49,10 +49,10 @@ sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-Clou
 # Generate a certificate
 
 Run the request script once on each new machine to:
- > Create a certificate store on the machine
- > Generate the certificate request and process via the Lets Encrypt service
- > Store the generated certificate files
- > Upload to FileMaker Server and restart (if specified in the .env variable)
+ - Create a certificate store on the machine
+ - Generate the certificate request and process via the Lets Encrypt service
+ - Store the generated certificate files
+ - Upload to FileMaker Server and restart (if specified in the .env variable)
 
  [sudo -E ./fm_request_cert.sh]
 
