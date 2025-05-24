@@ -16,14 +16,15 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 4. Navigate/CD to '/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt
 5. Create an empty .env file with the following command [sudo touch .env] and then open the file for editing with the command [sudo nano .env]
 6. Using the template [example_env.md] populate the .env file with the required details, adjusting the variables for the target machine as required
-7. Use the command [sudo rm fm_request_cert.sh && sudo rm fm_renew_cert.sh] to remove the two default installed 'HTTPS-01' challenge scripts.
-8. Use the command [sudo touch fm_request_cert.sh && sudo touch fm_renew_cert.sh] to create new blank script files
-9. Use the command [sudo chmod 777 fm_request_cert.sh && sudo chmod 777 fm_renew_cert.sh] to temporarily enable editing & saving in VSCode etc.
-10. Update the scripts to use the DNS-01 logic from the repo
-11. Once the scripts have been updated, ensure the ownership of each file is correctly set and the permissions are revised to owner only
+7. Change the permissions on the .env file to restrict access using command [sudo chmod 600 .env]
+8. Use the command [sudo rm fm_request_cert.sh && sudo rm fm_renew_cert.sh] to remove the two default installed 'HTTPS-01' challenge scripts.
+9. Use the command [sudo touch fm_request_cert.sh && sudo touch fm_renew_cert.sh] to create new blank script files
+10. Use the command [sudo chmod 777 fm_request_cert.sh && sudo chmod 777 fm_renew_cert.sh] to temporarily enable editing & saving in VSCode etc.
+11. Update the scripts to use the DNS-01 logic from the repo
+12. Once the scripts have been updated, ensure the ownership of each file is correctly set and the permissions are revised to owner only
 
-12. Save changes and run the updated script by using the command [sudo -E ./<name of script>] and entering the sudo password when requested.
-13. Depending on the value set on {Line 71} you should recieve either a "Testing successful" or a "Certificate Produced" message on completion. Process takes about 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
+13. Save changes and run the updated script by using the command [sudo -E ./<name of script>] and entering the sudo password when requested.
+14. Depending on the value set on {Line 71} you should recieve either a "Testing successful" or a "Certificate Produced" message on completion. Process takes about 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
 
 
 
