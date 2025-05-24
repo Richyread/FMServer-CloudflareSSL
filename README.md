@@ -10,21 +10,53 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 
 ## Steps to Generate SSL Certificates On A New Server ##
 
-1. Copy the commands from [Initial_setup.sh] onto target machine to install Certbot and supporting files
-2. Edit the empty cloudflare.ini file by pasting in a valid Cloudflare API key generated from your account
-3. Adjust permissions on the cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
-4. Navigate/CD to '/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt
-5. Create an empty .env file with the following command [sudo touch .env] and then open the file for editing with the command [sudo nano .env]
-6. Using the template [example_env.md] populate the .env file with the required details, adjusting the variables for the target machine as required
-7. Change the permissions on the .env file to restrict access using command [sudo chmod 600 .env]
-8. Use the command [sudo rm fm_request_cert.sh && sudo rm fm_renew_cert.sh] to remove the two default installed 'HTTPS-01' challenge scripts.
-9. Use the command [sudo touch fm_request_cert.sh && sudo touch fm_renew_cert.sh] to create new blank script files
-10. Use the command [sudo chmod 777 fm_request_cert.sh && sudo chmod 777 fm_renew_cert.sh] to temporarily enable editing & saving in VSCode etc.
-11. Update the scripts to use the DNS-01 logic from the repo
-12. Once the scripts have been updated, ensure the ownership of each file is correctly set and the permissions are revised to owner only
+# Initital setup and Cloudflare API key #
 
-13. Save changes and run the updated script by using the command [sudo -E ./<name of script>] and entering the sudo password when requested.
-14. Depending on the value set on {Line 71} you should recieve either a "Testing successful" or a "Certificate Produced" message on completion. Process takes about 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
+Copy the commands from [Initial_setup.sh] onto target machine to install Certbot and supporting files
+
+Edit the generated empty cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account
+
+Adjust permissions on the updated cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
+
+# Generate .env file & populate variables #
+
+Run the following commands to:
+> Navigate to the LetsEncrypt directory
+> Download the example_env.md template and save it as '.env' file
+> Set temporary permissions for easy editing
+
+[cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/example_env.md -o .env && \
+sudo chmod 666 .env]
+
+Go through the .env and adjust the variables for the target machine as required. Ensure you insert real values for Domain, Email etc.
+
+Once editing is completed, ensure you change the permissions on the .env file to restrict access using command [sudo chmod 600 .env]
+
+# Remove existing 'HTTPS-01' default scripts & recreate #
+
+Use the commands below command to:
+  > remove the two default installed 'HTTPS-01' challenge scripts.
+  > download the revised 'DNS-01' challenge scripts from github repo
+  > set correct ownership and permissions
+
+[sudo rm -f fm_{request,renew}_cert.sh && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh]
+    
+[sudo chown fmserver:fmsadmin fm_{request,renew}_cert.sh && sudo chmod 755 fm_{request,renew}_cert.sh]
+    
+# Generate a certificate
+
+Run the request script once on each new machine to:
+ > Create a certificate store on the machine
+ > Generate the certificate request and process via the Lets Encrypt service
+ > Store the generated certificate files
+ > Upload to FileMaker Server and restart (if specified in the .env variable)
+
+ [sudo -E ./fm_request_cert.sh]
+
+You should recieve either a "Testing successful" or a "Certificate Produced" message upon completion. Process takes around 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
 
 
 
