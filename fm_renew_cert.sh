@@ -2,235 +2,177 @@
 set -u
 set -o pipefail
 
-# This script runs the certbot renewal and imports the certificate into FileMaker Server. If the Certbot command is selected to
-# be ran, root will be required.
+#================================================================================
+# FileMaker Server - Let's Encrypt Certificate Renewal Script
+#
+# This script renews an existing Let's Encrypt certificate using Certbot, 
+# and imports the updated certificate into FileMaker Server.
+# Script has been streamlined to focus on systems using the DNS-01 Challenge (e.g. via Cloudflare)
+#
+# Requirements:
+# - Certbot must already be installed and a certificate must have been previously requested.
+# - This script should be run as root using: sudo -E ./fm_renew_cert.sh
+#
+# Configuration:
+# - Script reads from a `.env` file in the same directory for required settings.
 
-# Usage:
-# sudo -E ./fm_renew_cert.sh
+#Changes:
+# 23 May 2025
+# - adjusted script to reference '.env' file for variables
+# - removed hardcoded values for login details and domain name etc
+# - removed sections for user prompts (script will run autonomously using values in .env)
+# - removed remaining sections reffering to the HTTP-01 Challenge such as $WEBROOTPATH
 
-# Detects if FileMaker Server is still running
-isServerRunning()
-{
-    fmserver=$(ps axc | sed "s/.*:..... /\"/" | sed s/$/\"/ | grep fmserver)
-    if [[ -z $fmserver ]] ; then
-        return 0    # fmserver is not running
-    fi
-    return 1        # fmserver is running
-}
+#================================================================================
 
-# Used to redirect errors to stderr
-err()
-{
-    echo "$*" >&2
-}
+#-----------------------------------
+# Load configuration from .env file
+#-----------------------------------
 
-# Test to see if Certbot is installed
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/.env"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+    echo "Loading configuration from $CONFIG_FILE"
+    set -o allexport
+    source "$CONFIG_FILE"
+    set +o allexport
+else
+    echo "[ERROR] Configuration (.env) file not found at $CONFIG_FILE. Exiting..." 
+    exit 1
+fi
+
+#-----------------------------------
+# Check for Certbot installation
+#-----------------------------------
+
+echo "Checking for Certbot..."
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Ubuntu
-    if [[ ! -e "/snap/bin/certbot" ]] ; then
-        err "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh prior to running this script. Exiting..."
+    if [[ ! -e "/snap/bin/certbot" ]]; then
+        err "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh first. Exiting..."
         exit 1
     fi
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-	certbotLocation=$(command -v certbot)
-	# Installation directory for Mac with Apple Silicon /opt/homebrew/bin/certbot
-	# Installation directory for Intel-based Macs /usr/local/bin/certbot
-    if [[ -z "$certbotLocation" ]] ; then
-		err "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh prior to running this script. Exiting..."
-		exit 1
+    if ! command -v certbot &> /dev/null; then
+        err "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh first. Exiting"
+        exit 1
     fi
 fi
 
-# Restart Server After Importing
-PROMPT=1                                    # Set to 1 to get user prompts for script variables.
-RESTART_SERVER=1                            # [WARNING]: If set to 1, will automatically restart server, without warning.
-MAX_WAIT_AMOUNT=6                           # Used to determine max wait time for server to stop: time =  MAX_WAIT_AMOUNT * 10 seconds
+#-----------------------------------
+# Check for Filemaker Server Status
+#-----------------------------------
 
-# Certbot Parameters
-DOMAIN="sample_domain.com"                  # Domain used to generate the certificate
-FORCE_RENEW=0                               # Set to 1, this will force renewal of a certificate even if it is not needed. It is
-                                            # recommended to keep this set at 0.
-
-TEST_CERTIFICATE=0                          # Set to 1, this will not use up a request and can be used as a dry-run to test. If 
-                                            # Set to 0, the command will be run and will use up a certificate request.
-
-SECONDARY_MACHINE=0							# Set to 0, this script is being run on FileMaker Server Primary Machine, if 1: Secondary Machine
-
-if [ $PROMPT == 0 ] ; then
-	if [ $SECONDARY_MACHINE == 0 ] ; then
-		# FileMaker Admin Console Login Information
-		if [[ -n "${FAC_USERNAME}" ]]; then
-			FAC_USER="${FAC_USERNAME}"
-		else
-			err "[ERROR]: The FileMaker Server Admin Console Credentials was not set. Set FAC_USERNAME as an environment variable using export FAC_USERNAME="
-			err " If FAC_USERNAME and FAC_PASSWORD have been set, make sure to run the script using sudo -E ./fm_request_cert.sh"
-			err " Additionally, make sure that to set FAC_PASSWORD as an environment variable using export FAC_PASSWORD="
-			exit 1
-		fi
-
-		if [[ -n "${FAC_PASSWORD}" ]]; then
-			FAC_PASS="${FAC_PASSWORD}"
-		else
-			err "[ERROR]: The FileMaker Server Admin Console Credentials was not set. Set FAC_PASSWORD as an environment variable using export FAC_PASSWORD="
-			exit 1
-		fi
-	fi
-else
-    # Prompt user for values
-    echo " Enter the domain used to generate the certificate. If multiple domains were used, enter the name of the folder that the certificates should be found in."
-    read -p "   > Domain: " DOMAIN
-
-	echo " Is this script being run for a Primary or Secondary Installation of FileMaker Server?"
-    read -p "   > FileMaker Server Installation: (0 for Primary, 1 for Secondary): " SECONDARY_MACHINE
-
-    if [ $SECONDARY_MACHINE == 0 ] ; then
-		echo " To import the certificates and restart FileMaker Server, enter the FileMaker Admin Console credentials:"
-		read -s -p "   > Username: " FAC_USER
-		echo ""
-
-		read -s -p "   > Password: " FAC_PASS
-		echo ""
-	fi
-
-    echo " Do you want to restart FileMaker Server after the certificate is generated?"
-    read -p "   > Restart (0 for no, 1 for yes): " RESTART_SERVER
-
-    echo " Do you want to generate a test certificate?"
-    read -p "   > Test Validation (0 for no, 1 for yes): " TEST_CERTIFICATE
-
-    if [[ $TEST_CERTIFICATE -eq 0 ]] ; then
-        echo " Do you want to force renew the certificate?"
-        read -p "   > Force Renew (0 for no, 1 for yes): " FORCE_RENEW
+isServerRunning() {
+    local fmserver
+    fmserver=$(ps axc | awk '/fmserver/ {print $1}')
+    if [[ -z "$fmserver" ]]; then
+        return 0    # fmserver not running
+    else
+        return 1    # fmserver is tunning
     fi
-fi
+}
 
-# DO NOT EDIT - FileMaker Directories
+err() {
+    echo "$*" >&2
+}
+
+#-----------------------------------
+# Define Certificate Path
+#-----------------------------------
+
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     CERTBOTPATH="/opt/FileMaker/FileMaker Server/CStore/Certbot"
-    # detect if use is using Apache
-    if [[ -e "/opt/FileMaker/FileMaker\ Server/NginxServer/UseHttpd" ]] ; then
-        WEBROOTPATH="/opt/FileMaker/FileMaker Server/HTTPServer/htdocs/"
-    else
-        # default path for NGINX
-        WEBROOTPATH="/opt/FileMaker/FileMaker Server/NginxServer/htdocs/httpsRoot/"
-    fi
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     CERTBOTPATH="/Library/FileMaker Server/CStore/Certbot"
-    WEBROOTPATH="/Library/FileMaker Server/HTTPServer/htdocs/"
 fi
 
-# Set up paths for necessary directories
-if [[ ! -e "$WEBROOTPATH" ]] ; then
-    echo "[WARNING]: $WEBROOTPATH not found. Creating necessary directories." 
-    mkdir -p "$WEBROOTPATH"
-fi
-if [[ ! -e "$CERTBOTPATH" ]] ; then
-    err "[WARNING] $CERTBOTPATH not found. Certificate likely does not exist." 
+#-----------------------------------
+# Verify certificate path exists
+#-----------------------------------
+
+if [[ ! -d "$CERTBOTPATH" ]]; then
+    err "[ERROR] Certificate directory not found at $CERTBOTPATH"
     exit 1
 fi
 
-echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+#-----------------------------------
+# Certbot Renew Certificate
+#-----------------------------------
 
-# Ubuntu ONLY: Allow incoming connections into ufw
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    service ufw stop
-fi
+echo "Running Certbot renewal for domain: $DOMAIN"
 
-# run the certbot command
-if [[ $TEST_CERTIFICATE -eq 1 ]] ; then
-    echo "Generating test certificate request." 
-    certbot renew --dry-run --cert-name $DOMAIN -w "$WEBROOTPATH" --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"
+if [[ "$TEST_CERTIFICATE" == "1" ]]; then
+    certbot renew --dry-run --cert-name "$DOMAIN" -w "$WEBROOTPATH" \
+        --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"
 else
-    echo "Generating certificate request." 
-    if [[ $FORCE_RENEW -eq 1 ]] ; then
-        certbot renew --cert-name $DOMAIN --force-renew --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"
+    if [[ "$FORCE_RENEW" == "1" ]]; then
+        certbot renew --cert-name "$DOMAIN" --force-renew \
+            --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"
     else
-        certbot renew --cert-name $DOMAIN --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"
+        certbot renew --cert-name "$DOMAIN" \
+            --config-dir "$CERTBOTPATH" --work-dir "$CERTBOTPATH" --logs-dir "$CERTBOTPATH"
     fi
 fi
 
-# capture return code for running certbot command
 RETVAL=$?
-
-# Ubuntu ONLY: Restart ufw firewall
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    service ufw start
-fi
-
-echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-
-if [[ $RETVAL != 0 ]] ; then
-    err "[ERROR]: Certbot returned with a nonzero failure code. Check $CERTBOTPATH/letsencrypt.log for more information."
+if [[ $RETVAL -ne 0 ]]; then
+    err "[ERROR] Certbot renewal failed. Check logs in $CERTBOTPATH/letsencrypt.log"
     exit 1
 fi
 
-# if we are testing, we don't need to import/restart
-if [[ $TEST_CERTIFICATE -eq 1 ]] ; then
-    exit 1
-fi
+#-----------------------------------
+# Import certificate into FileMaker Server
+#-----------------------------------
 
 CERTFILEPATH=$(realpath "$CERTBOTPATH/live/$DOMAIN/fullchain.pem")
 PRIVKEYPATH=$(realpath "$CERTBOTPATH/live/$DOMAIN/privkey.pem")
 
-# grant fmserver:fmsadmin group ownership
-if [ -f "$PRIVKEYPATH" ] ; then
-    chown -R fmserver:fmsadmin "$CERTFILEPATH"
-else
-    err "[ERROR]: An error occurred with certificate renewal. No private key found."
+# Check certificate files exist
+if [[ ! -f "$CERTFILEPATH" || ! -f "$PRIVKEYPATH" ]]; then
+    err "[ERROR] Missing certificate or private key files after renewal."
     exit 1
 fi
 
-if [ -f "$CERTFILEPATH" ] ; then
-    chown -R fmserver:fmsadmin "$PRIVKEYPATH"
-else
-    err "[ERROR]: An error occurred with certificate renewal. No certificate found."
+chown -R fmserver:fmsadmin "$CERTFILEPATH" "$PRIVKEYPATH"
+
+echo "Importing renewed certificate into FileMaker Server..."
+fmsadmin certificate import "$CERTFILEPATH" --keyfile "$PRIVKEYPATH" -y -u "$FAC_USERNAME" -p "$FAC_PASSWORD"
+if [[ $? -ne 0 ]]; then
+    err "[ERROR] Failed to import certificate into FileMaker Server."
     exit 1
 fi
 
-# run fmsadmin import certificate
-echo "Importing Certificates:"
-echo "Certificate: $CERTFILEPATH"
-echo "Private key: $PRIVKEYPATH"
+#-----------------------------------
+# Optionally restart the FileMaker Server
+#-----------------------------------
 
-fmsadmin certificate import "$CERTFILEPATH" --keyfile "$PRIVKEYPATH" -y -u $FAC_USER -p $FAC_PASS
-
-# Capture return code for running certbot command
-RETVAL=$?
-if [ $RETVAL != 0 ] ; then
-    err "[ERROR]: FileMaker Server was unable to import the generated certificate."
-    exit 1
-fi
-
-# check if user wants to restart server
-if [[ $RESTART_SERVER == 1 ]] ; then
-    echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-    echo "Restarting FileMaker Server."
+if [[ "$RESTART_SERVER" == "1" ]]; then
+    echo "Restarting FileMaker Server to apply changes..."
     isServerRunning
-    serverIsRunning=$?
-    if [ $serverIsRunning -eq 1 ] ; then
+    if [[ $? -eq 1 ]]; then
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
             service fmshelper stop
-        elif [[ "$OSTYPE" == "darwin"* ]]; then
+        else
             launchctl stop com.filemaker.fms
         fi
     fi
 
     waitCounter=0
-    while [[ $waitCounter -lt $MAX_WAIT_AMOUNT ]] && [[ $serverIsRunning -eq 1 ]]
-    do
+    MAX_WAIT=${MAX_WAIT_AMOUNT:-6}
+    while [[ $waitCounter -lt $MAX_WAIT ]]; do
         sleep 10
         isServerRunning
-        serverIsRunning=$?
-        echo "Waiting for FileMaker Server process to terminate..."
-
-        waitCounter=$((waitCounter++))
+        [[ $? -eq 0 ]] && break
+        echo "Waiting for FileMaker Server to stop..."
+        ((waitCounter++))
     done
 
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         service fmshelper start
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
+    else
         launchctl start com.filemaker.fms
     fi
 fi
 
-echo "Lets Encrypt certificate renew script completed without any errors."
+echo "Certificate renewal and import completed successfully."
