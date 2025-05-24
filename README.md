@@ -4,7 +4,7 @@ Workspace to house scripts for generating SSL Certificates for FileMaker Server 
 
 Scripts modified from source provided by Claris as part of the standard installation contained in '/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt
 
-Primary modifications are to enable request & renewal of certificates via 'DNS-challenge' rather than the 'HTTP-challenge' which is currently the default (and only) option.
+Primary modifications are to enable request & renewal of certificates via 'DNS-01 Challenge' rather than the 'HTTP-01 Challenge' which is currently the default (and only) option.
 
 Whilst the changes are for Cloudflare specific dns-challenges, similar steps could be followed to substitue in any of the other providers etc. View the Certbot main documentation for DNS Plugins and subsequent tweaks required for each specific dns provider. In the example of Cloudflare you need to obtain an API key from your account and pass this through to the script via an 'cloudflare.ini' file.
 
@@ -13,17 +13,17 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 1. Copy the commands from [Initial_setup.sh] onto target machine to install Certbot and supporting files
 2. Edit the empty cloudflare.ini file by pasting in a valid Cloudflare API key generated from your account
 3. Adjust permissions on the cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
-4. Navigate to '/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt
-5. Edit the script [fm_request_cert.sh] to provide the following details:
-   
-   1. {Line 64} Add FQDN to be used for requested certificate
-   2. {Line 67} Add valid email address to receive alerts and assign requests against
-   3. {Line 71} Set value =0 for Production certificate
-   4. {Line 80} Add valid server Admin Console user account to allow for certificate upload
-   5. {Line 81} Add valid server Admin Console user password to allow for certificate upload
-   
-9. Save changes and run the updated script by using the command [sudo -E ./fm_request_cert.sh] and entering the sudo password when requested.
-10. Depending on the value set on {Line 71} you should recieve either a "Testing successful" or a "Certificate Produced" message on completion. Process takes about 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
+4. Navigate/CD to '/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt
+5. Create an empty .env file with the following command [sudo touch .env] and then open the file for editing with the command [sudo nano .env]
+6. Using the template [example_env.md] populate the .env file with the required details, adjusting the variables for the target machine as required
+7. Use the command [sudo rm fm_request_cert.sh && sudo rm fm_renew_cert.sh] to remove the two default installed 'HTTPS-01' challenge scripts.
+8. Use the command [sudo touch fm_request_cert.sh && sudo touch fm_renew_cert.sh] to create new blank script files
+9. Use the command [sudo chmod 777 fm_request_cert.sh && sudo chmod 777 fm_renew_cert.sh] to temporarily enable editing & saving in VSCode etc.
+10. Update the scripts to use the DNS-01 logic from the repo
+11. Once the scripts have been updated, ensure the ownership of each file is correctly set and the permissions are revised to owner only
+
+12. Save changes and run the updated script by using the command [sudo -E ./<name of script>] and entering the sudo password when requested.
+13. Depending on the value set on {Line 71} you should recieve either a "Testing successful" or a "Certificate Produced" message on completion. Process takes about 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
 
 
 
