@@ -14,7 +14,9 @@ Copy the commands from [Initial_setup.sh] onto target machine to install Certbot
 
 Edit the generated empty cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account
 
-Adjust permissions on the updated cloudflare.ini file using command ``` chmod 600 ~/.secrets/certbot/cloudflare.ini ```
+Adjust permissions and ownership values on the updated cloudflare.ini file to esnure that they are correctly owned and accessible only by root (or the Certbot command will fail) 
+
+``` sudo chown root:root ~/.secrets/certbot/cloudflare.ini && sudo chmod 600 ~/.secrets/certbot/cloudflare.ini ```
 
 ## Generate .env file & populate variables ##
 
@@ -25,7 +27,7 @@ Run the following commands to:
 
 ```
 cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/example_env.md -o .env && \
+sudo curl -sSL https://gist.githubusercontent.com/Richyread/366a2b309d931adfd9965939b68f018a/raw/ab24a374410f3de77c64831d4474fb7cf8b70e3a/example_env.md -o .env && \
 sudo chmod 666 .env
 ```
 
