@@ -59,7 +59,13 @@ sudo chmod 666 .env
 
 Go through the .env and adjust the variables for the target machine as required. Ensure you insert real values for Domain, Email etc.
 
-Once editing is completed, ensure you change the permissions on the .env file to restrict access using command [sudo chmod 600 .env]
+Once editing is completed save the file then ensure you correctly reset the permissions to restrict access:
+
+```
+
+sudo chmod 600 .env
+
+```
 
 ## Remove existing 'HTTPS-01' default scripts & recreate ##
 
