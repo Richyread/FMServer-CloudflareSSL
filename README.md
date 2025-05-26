@@ -44,8 +44,9 @@ Use the commands below command to:
 
 ```
 sudo rm -f fm_{request,renew}_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
+source .env
+sudo curl -sSL -H "Authorization: token $GITHUB_TOKEN" https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
+sudo curl -sSL -H "Authorization: token $GITHUB_TOKEN" https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
     
 ```
 
