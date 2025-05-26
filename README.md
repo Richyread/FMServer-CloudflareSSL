@@ -1,4 +1,5 @@
-# FileMaker_Server-CloudflareSSL - Steps to Generate an SSL Certificate on a New Server using LetsEncrypt service
+## FileMaker_Server-CloudflareSSL - Steps to Generate an SSL Certificate on a New Server using LetsEncrypt service
+--------
 
 Workspace to house scripts for generating SSL Certificates for FileMaker Server instances.
 
@@ -10,13 +11,38 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 
 ## Initital setup and Cloudflare API key ##
 
-Copy the commands from [Initial_setup.sh] onto target machine to install Certbot and supporting files
+Install Certbot package and set command links:
 
-Edit the generated empty cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account
+```
 
-Adjust permissions and ownership values on the updated cloudflare.ini file to esnure that they are correctly owned and accessible only by root (or the Certbot command will fail) 
+sudo snap install --classic certbot && \
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
 
-``` sudo chown root:root ~/.secrets/certbot/cloudflare.ini && sudo chmod 600 ~/.secrets/certbot/cloudflare.ini ```
+```
+
+Update Certbot permissions and install the dns-cloudflare plugin:
+
+```
+
+sudo snap set certbot trust-plugin-with-root=ok
+sudo snap install certbot-dns-cloudflare
+
+```
+
+Create the required Cloudflare.ini file for storing the API key:
+
+```
+
+mkdir -p ~/.secrets/certbot/ && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/cloudflare.ini -o cloudflare.ini
+sudo nano cloudflare.ini
+
+```
+
+Edit the downloaded cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account.
+
+The file should already have the correct 'root:root' and 'chmod 600' permissions & ownership values, but double check as the Certbot command will fail otherwise.
+
 
 ## Generate .env file & populate variables ##
 
@@ -27,7 +53,7 @@ Run the following commands to:
 
 ```
 cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
-sudo curl -sSL https://gist.githubusercontent.com/Richyread/366a2b309d931adfd9965939b68f018a/raw/ab24a374410f3de77c64831d4474fb7cf8b70e3a/example_env.md -o .env && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/example_env.md -o .env && \
 sudo chmod 666 .env
 ```
 
@@ -44,8 +70,8 @@ Use the commands below command to:
 
 ```
 sudo rm -f fm_{request,renew}_cert.sh && \
-sudo env GITHUB_TOKEN=$(sudo grep ^GITHUB_TOKEN= .env | cut -d '=' -f2-) curl -sSL -H "Authorization: token $GITHUB_TOKEN" https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
-sudo env GITHUB_TOKEN=$(sudo grep ^GITHUB_TOKEN= .env | cut -d '=' -f2-) curl -sSL -H "Authorization: token $GITHUB_TOKEN" https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
     
 ```
 
