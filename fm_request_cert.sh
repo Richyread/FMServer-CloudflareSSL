@@ -11,15 +11,6 @@ set -o pipefail
 # Usage:
 # sudo -E ./fm_request_cert.sh
 
-
-#Changes:
-# 23 May 2025
-# - adjusted script to reference '.env' file for variables
-# - removed hardcoded values for login details and domain name etc
-# - removed sections for user prompts (script will run autonomously using values in .env)
-# - removed remaining sections reffering to the HTTP-01 Challenge such as $WEBROOTPATH
-#================================================================================
-
 #-----------------------------------
 # Get script directory and load configuration from .env file
 #-----------------------------------
@@ -41,9 +32,9 @@ fi
 # Validate required environment variables
 #-------------------------------------------
 
-if [[ -z "${DOMAIN:-}" || -z "${FAC_USERNAME:-}" || -z "${FAC_PASSWORD:-}" ]]; then
+if [[ -z "${DOMAIN:-}" || -z "${CFAPI_PATH:-}" || -z "${FAC_USERNAME:-}" || -z "${FAC_PASSWORD:-}" ]]; then
     echo "[ERROR] Missing required environment variables in .env file."
-    echo "Ensure DOMAIN, FAC_USERNAME, and FAC_PASSWORD are set."
+    echo "Ensure DOMAIN, CFAPI_PATH, FAC_USERNAME, and FAC_PASSWORD are set."
     exit 1
 fi
 
@@ -70,22 +61,13 @@ fi
 #-----------------------------------
 
 isServerRunning() {
-    local fmserver
-    fmserver=$(ps axc | awk '/fmserver/ {print $1}')
-    if [[ -z "$fmserver" ]]; then
-        return 0    # fmserver not running
-    else
-        return 1    # fmserver is running
-    fi
-}
-
-err() {
-    echo "$*" >&2
+   pgrep -x fmserver > /dev/null
+   return $?
 }
 
 
 #-------------------------------------------
-# Define FMS paths
+# Define FMS Paths & Check Existing Certs
 #-------------------------------------------
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -96,25 +78,10 @@ fi
 
 mkdir -p "$CERTBOTPATH"
 
-
-#-------------------------------------------
-# Process comma-separated domain list
-#-------------------------------------------
-
-DOMAINLIST=()
-IFS=',' read -ra DOMAINS <<< "$DOMAIN"
-FIRST_DOMAIN=""
-for CUR_DOMAIN in "${DOMAINS[@]}"; do
-    if [[ -z "$FIRST_DOMAIN" ]]; then
-        FIRST_DOMAIN="$CUR_DOMAIN"
-    fi
-    DOMAINLIST+=("-d" "$CUR_DOMAIN")
-done
-
 # Check if cert already exists
-if [[ -e "$CERTBOTPATH/live/$FIRST_DOMAIN" ]]; then
-    echo "[ERROR] Certificate directory already exists for $FIRST_DOMAIN."
-    echo "Please backup and remove \"$CERTBOTPATH/live/$FIRST_DOMAIN\" before continuing."
+if [[ -e "$CERTBOTPATH/live/$DOMAIN" ]]; then
+    echo "[ERROR] Certificate directory already exists for $DOMAIN."
+    echo "Please backup and remove \"$CERTBOTPATH/live/$DOMAIN\" before continuing."
     exit 1
 fi
 
@@ -129,13 +96,13 @@ CERTBOT_ARGS=(
     certonly
     --dns-cloudflare
     --dns-cloudflare-credentials "$CFAPI_PATH"
+    --domain "$DOMAIN"
     --agree-tos
     --non-interactive
     --email "$EMAIL"
     --config-dir "$CERTBOTPATH"
     --work-dir "$CERTBOTPATH"
     --logs-dir "$CERTBOTPATH"
-    "${DOMAINLIST[@]}"
 )
 
 # Optional: add --dry-run for testing
@@ -192,31 +159,47 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-# check if user wants to restart server
+
+#-------------------------------------------
+# Optional FileMaker Server Restart
+#-------------------------------------------
+
 if [[ "${RESTART_SERVER:-0}" == 1 ]] ; then
     echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-    echo "Restarting FileMaker Server."
-    isServerRunning
-    serverIsRunning=$?
-    if [ $serverIsRunning -eq 1 ] ; then
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            service fmshelper stop
-        elif [[ "$OSTYPE" == "darwin"* ]]; then
-            launchctl stop com.filemaker.fms
-        fi
+    echo "Commencing FileMaker Server Service Restart."
+
+# stop the filemaker service
+    if   isServerRunning; then
+            if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+                service fmshelper stop
+            elif [[ "$OSTYPE" == "darwin"* ]]; then
+                launchctl stop com.filemaker.fms
+            fi
     fi
 
-    waitCounter=0
-    while [[ $waitCounter -lt $MAX_WAIT_AMOUNT ]] && [[ $serverIsRunning -eq 1 ]]
-    do
-        sleep 10
-        isServerRunning
-        serverIsRunning=$?
-        echo "Waiting for FileMaker Server process to terminate..."
+# now wait for the service to have completely stopped
+# create some temporary variables for handling the restart waiting function
 
-        waitCounter=$((waitCounter + 1))
+    sleep_interval=10 #how often to check if the service is still running
+    max_wait="${MAX_WAIT_AMOUNT:-60}" #total time in seconds to allow the server process to exit
+    max_attempt=$((max_wait/sleep_interval)) #used with the waitCounter to determine current attempts
+    waitCounter=0
+
+    echo "Waiting for FileMaker Server to stop...."
+    while [[ $waitCounter -lt $max_attempt ]]; do
+        isServerRunning || break
+        printf "  ...waiting (%ds elapsed of %ds max) \n" $((waitCounter*sleep_interval)) "$max_wait"
+        sleep $sleep_interval
+        ((waitCounter++))
     done
 
+    if isServerRunning; then
+        echo "[WARNING] Filemaker Server did not stop within the expected $max_wait seconds."
+        exit 1
+    else
+        echo "FileMaker Server stopped successfully."
+    fi
+    
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         service fmshelper start
     elif [[ "$OSTYPE" == "darwin"* ]]; then
