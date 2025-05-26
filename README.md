@@ -25,7 +25,7 @@ Run the following commands to:
 
 ```
 cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/example_env.md -o .env && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/example_env.md -o .env && \
 sudo chmod 666 .env
 ```
 
@@ -42,8 +42,8 @@ Use the commands below command to:
 
 ```
 sudo rm -f fm_{request,renew}_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
     
 ```
 
