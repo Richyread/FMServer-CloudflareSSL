@@ -119,7 +119,7 @@ fi
 RETVAL=$?
 
 if [[ $RETVAL -ne 0 ]]; then
-    echo "[ERROR] Certbot failed to request certificate."
+    echo "[ERROR] Certbot failed to request certificate. Check logs in $CERTBOTPATH/letsencrypt.log"
     exit 1
 fi
 
