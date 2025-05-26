@@ -1,4 +1,4 @@
-# FileMaker_Server-CloudflareSSL
+# FileMaker_Server-CloudflareSSL - Steps to Generate an SSL Certificate on a New Server using LetsEncrypt service
 
 Workspace to house scripts for generating SSL Certificates for FileMaker Server instances.
 
@@ -8,15 +8,13 @@ Primary modifications are to enable request & renewal of certificates via 'DNS-0
 
 Whilst the changes are for Cloudflare specific dns-challenges, similar steps could be followed to substitue in any of the other providers etc. View the Certbot main documentation for DNS Plugins and subsequent tweaks required for each specific dns provider. In the example of Cloudflare you need to obtain an API key from your account and pass this through to the script via an 'cloudflare.ini' file.
 
-# Steps to Generate SSL Certificates On A New Server #
-
 ## Initital setup and Cloudflare API key ##
 
 Copy the commands from [Initial_setup.sh] onto target machine to install Certbot and supporting files
 
 Edit the generated empty cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account
 
-Adjust permissions on the updated cloudflare.ini file using command [chmod 600 ~/.secrets/certbot/cloudflare.ini
+Adjust permissions on the updated cloudflare.ini file using command ``` chmod 600 ~/.secrets/certbot/cloudflare.ini ```
 
 ## Generate .env file & populate variables ##
 
@@ -25,9 +23,11 @@ Run the following commands to:
  - Download the example_env.md template and save it as '.env' file
  - Set temporary permissions for easy editing
 
-[cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
+```
+cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
 sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/example_env.md -o .env && \
-sudo chmod 666 .env]
+sudo chmod 666 .env
+```
 
 Go through the .env and adjust the variables for the target machine as required. Ensure you insert real values for Domain, Email etc.
 
@@ -40,12 +40,17 @@ Use the commands below command to:
   - download the revised 'DNS-01' challenge scripts from github repo
   - set correct ownership and permissions
 
-[sudo rm -f fm_{request,renew}_cert.sh && \
+```
+sudo rm -f fm_{request,renew}_cert.sh && \
 sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh]
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FileMaker_Server-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
     
-[sudo chown fmserver:fmsadmin fm_{request,renew}_cert.sh && sudo chmod 755 fm_{request,renew}_cert.sh]
-    
+```
+
+```
+sudo chown fmserver:fmsadmin fm_{request,renew}_cert.sh && sudo chmod 755 fm_{request,renew}_cert.sh
+
+```    
 ## Generate a certificate ##
 
 Run the request script once on each new machine to:
@@ -54,18 +59,22 @@ Run the request script once on each new machine to:
  - Store the generated certificate files
  - Upload to FileMaker Server and restart (if specified in the .env variable)
 
- [sudo -E ./fm_request_cert.sh]
+```
+sudo -E ./fm_request_cert.sh]
+```
 
-You should recieve either a "Testing successful" or a "Certificate Produced" message upon completion. Process takes around 30secs and should save any error messages to the log files located in [/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
+
+You should recieve either a "Testing successful" or a "Certificate Produced" message upon completion. Process takes around 30secs and should save any error messages to the log files located in /opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
 
 
+---------------------------------
 
-****Some tips/error resolutions***
+***Some tips/error resolutions***
   
-- Enable the scripts to be executable by using command [sudo chmod +x {name of script}]
+- Enable the scripts to be executable by using command ``` sudo chmod +x {name of script} ```
 
-- Change ownership of files by using [sudo chown user:group {name of file/directory}]
+- Change ownership of files by using ``` sudo chown user:group {name of file/directory} ```
 
-- Change file priveleges to owner only [sudo chmod 700 {file/directory}]
+- Change file priveleges to owner only ``` sudo chmod 700 {file/directory} ```
 
-- Change file privelges to read/write for all users [sudo chmod 755 {file/directory}]
+- Change file privelges to read/write for all users ``` sudo chmod 755 {file/directory} ```
