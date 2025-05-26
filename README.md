@@ -33,16 +33,25 @@ Create the required Cloudflare.ini file for storing the API key:
 
 ```
 
-mkdir -p ~/.secrets/certbot/ && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/cloudflare.ini -o cloudflare.ini
+sudo mkdir -p /root/.secrets/certbot/ && \
+cd /root/.secrets/certbot/ && \
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/cloudflare.ini -o cloudflare.ini && \
 sudo nano cloudflare.ini
+
 
 ```
 
 Edit the downloaded cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account.
 
-The file should already have the correct 'root:root' and 'chmod 600' permissions & ownership values, but double check as the Certbot command will fail otherwise.
+Once updated we need to secure the directory & file permissions correctly or Certbot will present an error on use.
 
+```
+
+sudo chmod 700 /root/.secrets && \
+sudo chmod 700 /root/.secrets/certbot && \
+sudo chmod 600 /root/.secrets/certbot/cloudflare.ini
+
+```
 
 ## Generate .env file & populate variables ##
 
