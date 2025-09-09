@@ -148,7 +148,25 @@ echo "Importing Certificates:"
 echo "Certificate: $CERTFILEPATH"
 echo "Private key: $PRIVKEYPATH"
 
-fmsadmin certificate import "$CERTFILEPATH" --keyfile "$PRIVKEYPATH" -y -u $FAC_USERNAME -p $FAC_PASSWORD
+echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+
+# Copy certificates to CStore for reliable import
+echo "Copying certificates to CStore directory..."
+cp "$CERTFILEPATH" /opt/FileMaker/FileMaker\ Server/CStore/
+cp "$PRIVKEYPATH" /opt/FileMaker/FileMaker\ Server/CStore/
+chown fmserver:fmsadmin /opt/FileMaker/FileMaker\ Server/CStore/fullchain.pem
+chown fmserver:fmsadmin /opt/FileMaker/FileMaker\ Server/CStore/privkey.pem
+
+# Import certificates from CStore
+echo "Importing Certificates:"
+echo "Certificate: /opt/FileMaker/FileMaker Server/CStore/fullchain.pem"
+echo "Private key: /opt/FileMaker/FileMaker Server/CStore/privkey.pem"
+
+fmsadmin certificate import "/opt/FileMaker/FileMaker Server/CStore/fullchain.pem" --keyfile "/opt/FileMaker/FileMaker Server/CStore/privkey.pem" -y -u $FAC_USERNAME -p $FAC_PASSWORD
+
+# Clean up temporary files
+rm -f /opt/FileMaker/FileMaker\ Server/CStore/fullchain.pem
+rm -f /opt/FileMaker/FileMaker\ Server/CStore/privkey.pem
 
 if [[ $? -ne 0 ]]; then
     echo "[ERROR] FileMaker Server failed to import certificate."
