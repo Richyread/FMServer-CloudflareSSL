@@ -52,14 +52,19 @@ fi
 echo "Checking for Certbot..."
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if [[ ! -e "/snap/bin/certbot" ]]; then
-        err "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh first. Exiting..."
+        echo "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh first. Exiting..."
         exit 1
     fi
+    CERTBOT_CMD="/snap/bin/certbot"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     if ! command -v certbot &> /dev/null; then
-        err "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh first. Exiting"
+        echo "[ERROR] Certbot not installed. Please install Certbot and run fm_request_cert.sh first. Exiting"
         exit 1
     fi
+    CERTBOT_CMD="certbot"
+else
+   echo "[ERROR] Unsupported operating system: $OSTYPE. This script supports Linux and MacOS only."
+   exit 1
 fi
 
 #-----------------------------------
@@ -82,13 +87,15 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     CERTBOTPATH="/Library/FileMaker Server/CStore/Certbot"
 fi
 
+CERTFILEPATH="$CERTBOTPATH/live/$DOMAIN/fullchain.pem"
+PRIVKEYPATH="$CERTBOTPATH/live/$DOMAIN/privkey.pem"
 
 #-----------------------------------
 # Verify certificate path exists
 #-----------------------------------
 
 if [[ ! -d "$CERTBOTPATH" ]]; then
-    err "[ERROR] Certificate directory not found at $CERTBOTPATH"
+    echo "[ERROR] Certificate directory not found at $CERTBOTPATH"
     exit 1
 fi
 
@@ -102,6 +109,8 @@ echo "Running Certbot renewal for domain: $DOMAIN"
 CERTBOT_ARGS=(
     renew
     --cert-name "$DOMAIN"
+    --dns-cloudflare
+    --dns-cloudflare-credentials "$CFAPI_PATH"
     --config-dir "$CERTBOTPATH"
     --work-dir "$CERTBOTPATH"
     --logs-dir "$CERTBOTPATH"
@@ -114,7 +123,7 @@ fi
 
 # Optional add --force-renew to always renew even if it is not expired
 
-if [[ "${FORCE_RENEW:-0}" =="1" ]]; then
+if [[ "${FORCE_RENEW:-0}" == "1" ]]; then
     CERTBOT_ARGS+=(--force-renew)
 fi
 
@@ -128,6 +137,12 @@ fi
 
 echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
 
+# Fix certificate file ownership for FileMaker Server access
+echo "Fixing certificate file ownership.."
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+   chown -R fmserver:fmsadmin "$CERTBOTPATH/archive/$DOMAIN/"
+   chown -R fmserver:fmsadmin "$CERTBOTPATH/live/$DOMAIN/"
+fi
 # import certificates
 echo "Importing Certificates:"
 echo "Certificate: $CERTFILEPATH"
