@@ -11,12 +11,13 @@ Whilst the changes are for Cloudflare specific dns-challenges, similar steps cou
 
 ## Initital setup and Cloudflare API key ##
 
-Install Certbot package and set command links:
+Become root & install Certbot package and set command links:
 
 ```
+sudo -i
 
-sudo snap install --classic certbot && \
-sudo ln -s /snap/bin/certbot /usr/bin/certbot
+snap install --classic certbot && \
+ln -s /snap/bin/certbot /usr/bin/certbot
 
 ```
 
@@ -24,8 +25,8 @@ Update Certbot permissions and install the dns-cloudflare plugin:
 
 ```
 
-sudo snap set certbot trust-plugin-with-root=ok
-sudo snap install certbot-dns-cloudflare
+snap set certbot trust-plugin-with-root=ok
+snap install certbot-dns-cloudflare
 
 ```
 
@@ -33,10 +34,10 @@ Create the required Cloudflare.ini file for storing the API key:
 
 ```
 
-sudo mkdir -p /root/.secrets/certbot/ && \
+mkdir -p /root/.secrets/certbot/ && \
 cd /root/.secrets/certbot/ && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/cloudflare.ini -o cloudflare.ini && \
-sudo nano cloudflare.ini
+curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/cloudflare.ini -o cloudflare.ini && \
+nano cloudflare.ini
 
 
 ```
@@ -47,9 +48,9 @@ Once updated we need to secure the directory & file permissions correctly or Cer
 
 ```
 
-sudo chmod 700 /root/.secrets && \
-sudo chmod 700 /root/.secrets/certbot && \
-sudo chmod 600 /root/.secrets/certbot/cloudflare.ini
+chmod 700 /root/.secrets && \
+chmod 700 /root/.secrets/certbot && \
+chmod 600 /root/.secrets/certbot/cloudflare.ini
 
 ```
 
@@ -62,8 +63,10 @@ Run the following commands to:
 
 ```
 cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt" && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/example_env.md -o .env && \
-sudo chmod 666 .env
+curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/example_env.md -o .env && \
+chmod 666 .env
+
+nano .env
 ```
 
 Go through the .env and adjust the variables for the target machine as required. Ensure you insert real values for Domain, Email etc.
@@ -72,7 +75,7 @@ Once editing is completed save the file then ensure you correctly reset the perm
 
 ```
 
-sudo chmod 600 .env
+chmod 600 .env
 
 ```
 
@@ -84,14 +87,14 @@ Use the commands below command to:
   - set correct ownership and permissions
 
 ```
-sudo rm -f fm_{request,renew}_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
-sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
+rm -f fm_{request,renew}_cert.sh && \
+curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_request_cert.sh -o fm_request_cert.sh && \
+curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/fm_renew_cert.sh -o fm_renew_cert.sh
     
 ```
 
 ```
-sudo chown fmserver:fmsadmin fm_{request,renew}_cert.sh && sudo chmod 755 fm_{request,renew}_cert.sh
+chown fmserver:fmsadmin fm_{request,renew}_cert.sh && sudo chmod 755 fm_{request,renew}_cert.sh
 
 ```    
 ## Generate a certificate ##
@@ -103,6 +106,7 @@ Run the request script once on each new machine to:
  - Upload to FileMaker Server and restart (if specified in the .env variable)
 
 ```
+exit
 sudo -E ./fm_request_cert.sh]
 ```
 
