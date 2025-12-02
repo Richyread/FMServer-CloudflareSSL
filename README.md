@@ -81,7 +81,7 @@ chmod 600 .env
 
 ## Remove existing 'HTTPS-01' default scripts & recreate ##
 
-Use the commands below command to:
+Use the commands below to:
   - remove the two default installed 'HTTPS-01' challenge scripts
   - download the revised 'DNS-01' challenge scripts from github repo
   - set correct ownership and permissions
