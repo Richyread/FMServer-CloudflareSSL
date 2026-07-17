@@ -27,6 +27,7 @@ CONFIG_FILE="$SCRIPT_DIR/.env"
 if [[ -f "$CONFIG_FILE" ]]; then
     echo "Loading configuration from $CONFIG_FILE"
     set -o allexport
+    # shellcheck disable=SC1090  # .env path is runtime-resolved, not lintable
     source "$CONFIG_FILE"
     set +o allexport
 else
@@ -83,8 +84,10 @@ isServerRunning() {
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     CERTBOTPATH="/opt/FileMaker/FileMaker Server/CStore/Certbot"
+    CSTOREPATH="/opt/FileMaker/FileMaker Server/CStore"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     CERTBOTPATH="/Library/FileMaker Server/CStore/Certbot"
+    CSTOREPATH="/Library/FileMaker Server/CStore"
 fi
 
 CERTFILEPATH="$CERTBOTPATH/live/$DOMAIN/fullchain.pem"
@@ -152,73 +155,127 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
 # Copy certificates to CStore for reliable import
 echo "Copying certificates to CStore directory..."
-cp "$CERTFILEPATH" /opt/FileMaker/FileMaker\ Server/CStore/
-cp "$PRIVKEYPATH" /opt/FileMaker/FileMaker\ Server/CStore/
-chown fmserver:fmsadmin /opt/FileMaker/FileMaker\ Server/CStore/fullchain.pem
-chown fmserver:fmsadmin /opt/FileMaker/FileMaker\ Server/CStore/privkey.pem
+cp "$CERTFILEPATH" "$CSTOREPATH/"
+cp "$PRIVKEYPATH" "$CSTOREPATH/"
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    chown fmserver:fmsadmin "$CSTOREPATH/fullchain.pem"
+    chown fmserver:fmsadmin "$CSTOREPATH/privkey.pem"
+fi
 
 # Import certificates from CStore
 echo "Importing Certificates:"
-echo "Certificate: /opt/FileMaker/FileMaker Server/CStore/fullchain.pem"
-echo "Private key: /opt/FileMaker/FileMaker Server/CStore/privkey.pem"
+echo "Certificate: $CSTOREPATH/fullchain.pem"
+echo "Private key: $CSTOREPATH/privkey.pem"
 
-fmsadmin certificate import "/opt/FileMaker/FileMaker Server/CStore/fullchain.pem" --keyfile "/opt/FileMaker/FileMaker Server/CStore/privkey.pem" -y -u $FAC_USERNAME -p $FAC_PASSWORD
+fmsadmin certificate import "$CSTOREPATH/fullchain.pem" --keyfile "$CSTOREPATH/privkey.pem" -y -u "$FAC_USERNAME" -p "$FAC_PASSWORD"
+# Capture the import result BEFORE the cleanup commands overwrite $? (previously the
+# error check below tested the `rm` exit code, so a failed import was silently ignored).
+IMPORT_RETVAL=$?
 
 # Clean up temporary files
-rm -f /opt/FileMaker/FileMaker\ Server/CStore/fullchain.pem
-rm -f /opt/FileMaker/FileMaker\ Server/CStore/privkey.pem
+rm -f "$CSTOREPATH/fullchain.pem"
+rm -f "$CSTOREPATH/privkey.pem"
 
-if [[ $? -ne 0 ]]; then
+if [[ $IMPORT_RETVAL -ne 0 ]]; then
     echo "[ERROR] FileMaker Server failed to import certificate."
     exit 1
 fi
 
 
 #-------------------------------------------
-# Optional FileMaker Server Restart
+# FileMaker Server Restart + verification
 #-------------------------------------------
+# IMPORTANT: FileMaker Server bundles its own nginx, which reads the certificate
+# into memory at start-up and does NOT re-read it when the file on disk changes.
+# So a successful `fmsadmin certificate import` alone is NOT enough — until FMS is
+# restarted, port 443 keeps serving the OLD certificate. This is the recurring
+# "cert imported but stale cert still served on 443" failure mode. We therefore use
+# an atomic restart, confirm the service came back up, and verify on the wire that
+# 443 is actually serving the new certificate.
 
 if [[ "${RESTART_SERVER:-0}" == 1 ]] ; then
     echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-    echo "Commencing FileMaker Server Service Restart."
+    echo "Restarting FileMaker Server to load the new certificate..."
 
-# stop the filemaker service
-    if   isServerRunning; then
-            if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-                service fmshelper stop
-            elif [[ "$OSTYPE" == "darwin"* ]]; then
-                launchctl stop com.filemaker.fms
-            fi
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Atomic restart (single transaction) replaces the old stop-wait-start, which
+        # could leave the start step unconfirmed and nginx holding the old cert.
+        # If your box uses a different service/unit name, confirm it once with:
+        #   systemctl list-units --type=service | grep -iE 'fm|nginx'
+        if command -v systemctl &> /dev/null; then
+            systemctl restart fmshelper
+        else
+            # Fallback for non-systemd (older/SysV) hosts.
+            service fmshelper restart
+        fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        launchctl stop com.filemaker.fms
+        launchctl start com.filemaker.fms
     fi
 
-# now wait for the service to have completely stopped
-# create some temporary variables for handling the restart waiting function
-
-    sleep_interval=10 #how often to check if the service is still running
-    max_wait="${MAX_WAIT_AMOUNT:-60}" #total time in seconds to allow the server process to exit
-    max_attempt=$((max_wait/sleep_interval)) #used with the waitCounter to determine current attempts
+    # --- Verify the FileMaker Server process came back up ---
+    sleep_interval=5                        # how often to poll for the process
+    max_wait="${MAX_WAIT_AMOUNT:-60}"       # total seconds to allow the service to return
+    max_attempt=$((max_wait/sleep_interval))
     waitCounter=0
 
-    echo "Waiting for FileMaker Server to stop...."
+    echo "Waiting for FileMaker Server to come back up..."
     while [[ $waitCounter -lt $max_attempt ]]; do
-        isServerRunning || break
-        printf "  ...waiting (%ds elapsed of %ds max) \n" $((waitCounter*sleep_interval)) "$max_wait"
+        isServerRunning && break
+        printf "  ...waiting (%ds elapsed of %ds max)\n" $((waitCounter*sleep_interval)) "$max_wait"
         sleep $sleep_interval
-        ((waitCounter++))
+        ((waitCounter++)) || true
     done
 
-    if isServerRunning; then
-        echo "[WARNING] Filemaker Server did not stop within the expected $max_wait seconds."
+    if ! isServerRunning; then
+        echo "[ERROR] FileMaker Server did not come back up within $max_wait seconds after restart."
         exit 1
-    else
-        echo "FileMaker Server stopped successfully."
     fi
-    
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        service fmshelper start
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        launchctl start com.filemaker.fms
+    echo "FileMaker Server process is running."
+
+    # --- Confirm the systemd service is active (Linux only) ---
+    if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v systemctl &> /dev/null; then
+        if ! systemctl is-active --quiet fmshelper; then
+            echo "[ERROR] fmshelper service is not active after restart."
+            exit 1
+        fi
+        echo "fmshelper service is active."
+    fi
+
+    # --- Verify the NEW certificate is actually served on port 443 ---
+    # Guards against the "imported but nginx still serving old cert" failure mode.
+    if command -v openssl &> /dev/null; then
+        echo "Verifying the certificate served on port 443 matches the newly issued one..."
+
+        # Expected end date from the freshly issued cert on disk.
+        EXPECTED_ENDDATE=$(openssl x509 -enddate -noout -in "$CERTFILEPATH" 2>/dev/null | cut -d= -f2)
+
+        wire_ok=0
+        SERVED_ENDDATE=""
+        for attempt in 1 2 3 4 5 6; do   # nginx needs a few seconds to bind 443
+            SERVED_ENDDATE=$(echo | openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" 2>/dev/null \
+                | openssl x509 -enddate -noout 2>/dev/null | cut -d= -f2)
+            if [[ -n "$SERVED_ENDDATE" && "$SERVED_ENDDATE" == "$EXPECTED_ENDDATE" ]]; then
+                wire_ok=1
+                break
+            fi
+            echo "  ...cert on 443 not yet updated (attempt $attempt), waiting..."
+            sleep 5
+        done
+
+        if [[ $wire_ok -eq 1 ]]; then
+            echo "[OK] Port 443 is serving the new certificate (expires: $SERVED_ENDDATE)."
+        else
+            echo "[ERROR] Port 443 is still NOT serving the new certificate after restart."
+            echo "        Expected notAfter: $EXPECTED_ENDDATE"
+            echo "        Served   notAfter: ${SERVED_ENDDATE:-<none / host unreachable>}"
+            echo "        This is the classic 'cert imported but nginx serving stale cert' failure."
+            echo "        Try a full restart, or check for orphaned nginx processes holding the old cert."
+            exit 1
+        fi
+    else
+        echo "[WARNING] openssl not found — skipping on-the-wire certificate verification."
     fi
 fi
 
-echo "Lets Encrypt certificate request script completed without any errors."
+echo "Lets Encrypt certificate renewal script completed without any errors."

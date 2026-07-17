@@ -7,9 +7,9 @@ Scripts modified from source provided by Claris as part of the standard installa
 
 Primary modifications are to enable request & renewal of certificates via 'DNS-01 Challenge' rather than the 'HTTP-01 Challenge' which is currently the default (and only) option.
 
-Whilst the changes are for Cloudflare specific dns-challenges, similar steps could be followed to substitue in any of the other providers etc. View the Certbot main documentation for DNS Plugins and subsequent tweaks required for each specific dns provider. In the example of Cloudflare you need to obtain an API key from your account and pass this through to the script via an 'cloudflare.ini' file.
+Whilst the changes are for Cloudflare specific dns-challenges, similar steps could be followed to substitute in any of the other providers etc. View the Certbot main documentation for DNS Plugins and subsequent tweaks required for each specific dns provider. In the example of Cloudflare you need to obtain an API token from your account and pass this through to the script via a 'cloudflare.ini' file.
 
-## Initital setup and Cloudflare API key ##
+## Initial setup and Cloudflare API token ##
 
 Become root & install Certbot package and set command links:
 
@@ -42,7 +42,9 @@ nano cloudflare.ini
 
 ```
 
-Edit the downloaded cloudflare.ini file by pasting in a valid Cloudflare API key from your Cloudflare account.
+Edit the downloaded cloudflare.ini file by pasting in a valid Cloudflare API token from your Cloudflare account.
+
+> The token needs **Zone → DNS → Edit** (plus **Zone → Read**) permission for the relevant zone so that Certbot can create and remove the `_acme-challenge` TXT record during the DNS-01 challenge. A scoped API token is preferred over a global API key.
 
 Once updated we need to secure the directory & file permissions correctly or Certbot will present an error on use.
 
@@ -107,11 +109,24 @@ Run the request script once on each new machine to:
 
 ```
 exit
-sudo -E ./fm_request_cert.sh]
+sudo -E ./fm_request_cert.sh
 ```
 
 
-You should recieve either a "Testing successful" or a "Certificate Produced" message upon completion. Process takes around 30secs and should save any error messages to the log files located in /opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
+You should receive either a "Testing successful" or a "Certificate Produced" message upon completion. Process takes around 30secs and should save any error messages to the log files located in /opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt/letsencrypt.log
+
+## Renewing a certificate ##
+
+Let's Encrypt certificates are valid for 90 days. Because these scripts issue the certificate into a custom Certbot `--config-dir` (under FileMaker Server's `CStore/Certbot`), **Certbot's built-in snap auto-renew timer cannot see them** — so renewal is a manual step (run it when you are within ~2-3 weeks of expiry, or drive it from a reminder/monitor):
+
+```
+cd "/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt"
+sudo -E ./fm_renew_cert.sh
+```
+
+The renewal script renews via the DNS-01 challenge, imports the new certificate into FileMaker Server, restarts the service, and then **verifies on the wire that port 443 is actually serving the new certificate** (guarding against the "cert imported but old cert still served" failure mode). Set `FORCE_RENEW=1` in `.env` to renew even when the certificate is not yet within Certbot's 30-day renewal window (useful for testing).
+
+> **After any FileMaker Server upgrade**, re-verify that the DNS-01 scripts in `Tools/Lets_Encrypt/` were not overwritten by Claris's default HTTP-01 versions — a server upgrade can restore the stock scripts. Re-download from this repo if needed.
 
 
 ---------------------------------
@@ -122,6 +137,6 @@ You should recieve either a "Testing successful" or a "Certificate Produced" mes
 
 - Change ownership of files by using ``` sudo chown user:group {name of file/directory} ```
 
-- Change file priveleges to owner only ``` sudo chmod 700 {file/directory} ```
+- Change file privileges to owner only ``` sudo chmod 700 {file/directory} ```
 
-- Change file privelges to read/write for all users ``` sudo chmod 755 {file/directory} ```
+- Change file privileges to read/write for all users ``` sudo chmod 755 {file/directory} ```
