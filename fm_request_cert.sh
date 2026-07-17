@@ -62,7 +62,9 @@ fi
 #-----------------------------------
 
 isServerRunning() {
-   pgrep -x fmserver > /dev/null
+   # FMS's DB daemon is `fmserverd` (not `fmserver`). Used only as a fallback on
+   # non-systemd hosts; on Linux the systemd service state is the primary signal.
+   pgrep -x fmserverd > /dev/null
    return $?
 }
 
@@ -211,33 +213,35 @@ if [[ "${RESTART_SERVER:-0}" == 1 ]] ; then
         launchctl start com.filemaker.fms
     fi
 
-    # --- Verify the FileMaker Server process came back up ---
+    # --- Wait for FileMaker Server to report ready ---
+    # Prefer the systemd service state (fast + version-stable) over matching an exact
+    # process name. This gate is advisory: the real proof is the on-wire check below,
+    # so a timeout WARNS and continues rather than aborting.
+    server_ready() {
+        if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v systemctl &> /dev/null; then
+            systemctl is-active --quiet fmshelper
+        else
+            isServerRunning
+        fi
+    }
+
     sleep_interval=5
-    max_wait="${MAX_WAIT_AMOUNT:-60}"
+    max_wait="${MAX_WAIT_AMOUNT:-90}"
     max_attempt=$((max_wait/sleep_interval))
     waitCounter=0
 
     echo "Waiting for FileMaker Server to come back up..."
     while [[ $waitCounter -lt $max_attempt ]]; do
-        isServerRunning && break
+        server_ready && break
         printf "  ...waiting (%ds elapsed of %ds max)\n" $((waitCounter*sleep_interval)) "$max_wait"
         sleep $sleep_interval
         ((waitCounter++)) || true
     done
 
-    if ! isServerRunning; then
-        echo "[ERROR] FileMaker Server did not come back up within $max_wait seconds after restart."
-        exit 1
-    fi
-    echo "FileMaker Server process is running."
-
-    # --- Confirm the systemd service is active (Linux only) ---
-    if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v systemctl &> /dev/null; then
-        if ! systemctl is-active --quiet fmshelper; then
-            echo "[ERROR] fmshelper service is not active after restart."
-            exit 1
-        fi
-        echo "fmshelper service is active."
+    if server_ready; then
+        echo "FileMaker Server reports ready (fmshelper active)."
+    else
+        echo "[WARNING] FileMaker Server did not report ready within $max_wait seconds; checking the wire anyway."
     fi
 
     # --- Verify the NEW certificate is actually served on port 443 ---
