@@ -160,6 +160,12 @@ cp "$PRIVKEYPATH" "$CSTOREPATH/"
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     chown fmserver:fmsadmin "$CSTOREPATH/fullchain.pem"
     chown fmserver:fmsadmin "$CSTOREPATH/privkey.pem"
+    # FMS 2026's certificate-import process reads these files as a non-owner, so a
+    # 600 private key (certbot's default) fails the import with a misleading
+    # "Cannot decrypt the private key file / Error 20408 (File read error)". Make the
+    # transient CStore copies readable for the import; they are deleted immediately
+    # after (below), and the certbot store keeps its own 600 originals untouched.
+    chmod 644 "$CSTOREPATH/fullchain.pem" "$CSTOREPATH/privkey.pem"
 fi
 
 # Import certificates from CStore

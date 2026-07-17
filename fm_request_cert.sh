@@ -73,8 +73,10 @@ isServerRunning() {
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     CERTBOTPATH="/opt/FileMaker/FileMaker Server/CStore/Certbot"
+    CSTOREPATH="/opt/FileMaker/FileMaker Server/CStore"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     CERTBOTPATH="/Library/FileMaker Server/CStore/Certbot"
+    CSTOREPATH="/Library/FileMaker Server/CStore"
 fi
 
 mkdir -p "$CERTBOTPATH"
@@ -143,20 +145,36 @@ if [[ ! -f "$CERTFILEPATH" || ! -f "$PRIVKEYPATH" ]]; then
     exit 1
 fi
 
-# Ensure correct ownership
+# Copy certificates to CStore for import. FMS's own engine (running as the fmserver
+# user) can't traverse certbot's locked-down live/archive tree — importing directly
+# from there fails with Error 20405 (File not found or not accessible) on FMS 2026 —
+# so stage the files in CStore, which the engine can read.
+echo "Copying certificates to CStore directory..."
+cp "$CERTFILEPATH" "$CSTOREPATH/"
+cp "$PRIVKEYPATH" "$CSTOREPATH/"
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    chown -R fmserver:fmsadmin "$CERTFILEPATH" "$PRIVKEYPATH"
+    chown fmserver:fmsadmin "$CSTOREPATH/fullchain.pem"
+    chown fmserver:fmsadmin "$CSTOREPATH/privkey.pem"
+    # FMS 2026's certificate-import process reads these as a non-owner, so a 600
+    # private key (certbot's default) fails with a misleading "Cannot decrypt the
+    # private key file / Error 20408 (File read error)". Make the transient CStore
+    # copies readable for the import; they are deleted immediately after (below).
+    chmod 644 "$CSTOREPATH/fullchain.pem" "$CSTOREPATH/privkey.pem"
 fi
 
 echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
 
 # import certificates
 echo "Importing Certificates:"
-echo "Certificate: $CERTFILEPATH"
-echo "Private key: $PRIVKEYPATH"
+echo "Certificate: $CSTOREPATH/fullchain.pem"
+echo "Private key: $CSTOREPATH/privkey.pem"
 
-fmsadmin certificate import "$CERTFILEPATH" --keyfile "$PRIVKEYPATH" -y -u "$FAC_USERNAME" -p "$FAC_PASSWORD"
+fmsadmin certificate import "$CSTOREPATH/fullchain.pem" --keyfile "$CSTOREPATH/privkey.pem" -y -u "$FAC_USERNAME" -p "$FAC_PASSWORD"
 IMPORT_RETVAL=$?
+
+# Clean up the transient CStore copies (keep the certbot store as the source of truth)
+rm -f "$CSTOREPATH/fullchain.pem"
+rm -f "$CSTOREPATH/privkey.pem"
 
 if [[ $IMPORT_RETVAL -ne 0 ]]; then
     echo "[ERROR] FileMaker Server failed to import certificate."
