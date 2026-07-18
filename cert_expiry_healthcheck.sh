@@ -7,19 +7,21 @@
 # cert can't be read at all — it withholds the ping, so healthchecks.io alerts
 # after its grace window = "re-run the DNS-01 renewal now".
 #
-#   Design:  John's Wiki > Infrastructure/Backups/Backup-and-Drop-Monitoring-Watchdog.md (Phase 4)
-#   Renewal: SSL-Certificate-Renewal-Runbook-FMS-Certbot-DNS-01.md (Section 5)
-#
 # Generic by design: this file is identical on every box. Only the CERTS lines
 # below differ per box (same pattern as the renewal script's .env).
 
 set -uo pipefail
 
 # --- Config: one line per cert THIS box should probe -------------------------
-# Format:  "HOST:PORT|https://hc-ping.com/<check-uuid>"
-# Probe the cert this box actually serves (its own :443).
+# Format:  "FQDN:PORT|PING_URL"
+#   FQDN     = the certificate's fully-qualified domain name. Probe each box
+#              against its OWN :443 so SNI selects the right cert.
+#   PING_URL = the full healthchecks.io ping URL for this cert's check, pasted
+#              exactly as copied from healthchecks.io (it already starts https://).
+# Replace BOTH placeholders below with real values on the box; leave this repo
+# copy generic (a real ping URL is a spoofable secret — never commit it).
 CERTS=(
-  "rcms.scruffies.co.uk:443|https://hc-ping.com/REPLACE-WITH-CHECK-UUID"
+  "CERT_FQDN_HERE:443|PASTE_HEALTHCHECKS_PING_URL_HERE"
 )
 
 THRESHOLD_DAYS=14     # ping only while MORE than this many days remain

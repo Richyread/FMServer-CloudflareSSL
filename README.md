@@ -134,7 +134,7 @@ Because these certificates renew **manually** (see above), the safety net is a r
 
 **How it works — active probe, not ping-on-renewal.** A daily cron reads the *live* certificate expiry straight off the wire (`openssl s_client`) and pings a healthchecks.io check **only while more than `THRESHOLD_DAYS` (default 14) remain**. When the certificate nears expiry — **or** a renewal has silently failed, **or** the certificate can't be read at all — the ping is withheld, so healthchecks.io alerts after its grace window. That means the alert tracks the *real* cert state on the wire rather than trusting a human to remember to ping on a successful renewal (these certs have lapsed under manual handling before, which is exactly why the probe is state-based).
 
-> **Public repo — never commit a real ping URL.** A healthchecks.io ping URL is a secret: anyone who has it can spoof a healthy ping and suppress your alert. The `CERTS` line in this repo copy must keep the `REPLACE-WITH-CHECK-UUID` placeholder. Put the real `hc-ping.com/<uuid>` only in the copy installed on each server.
+> **Public repo — never commit a real ping URL.** A healthchecks.io ping URL is a secret: anyone who has it can spoof a healthy ping and suppress your alert. The `CERTS` line in this repo copy must keep its generic `CERT_FQDN_HERE` / `PASTE_HEALTHCHECKS_PING_URL_HERE` placeholders. Put the real domain and ping URL only in the copy installed on each server.
 
 **Set-up (per server):**
 
@@ -147,7 +147,7 @@ sudo chmod 755 /usr/local/sbin/cert_expiry_healthcheck.sh
 sudo nano /usr/local/sbin/cert_expiry_healthcheck.sh
 ```
 
-The `CERTS` array takes one `"host:port|https://hc-ping.com/<uuid>"` entry per certificate — probe each box against **its own** `:443` so you check the exact certificate being served (this avoids split-horizon DNS resolving the name to a different front-end/cert).
+The `CERTS` array takes one `"FQDN:port|PING_URL"` entry per certificate, where `PING_URL` is the full healthchecks.io URL pasted exactly as copied — probe each box against **its own** `:443` so you check the exact certificate being served (this avoids split-horizon DNS resolving the name to a different front-end/cert).
 
 3. Add a daily cron entry and test once (the check should flip green):
 
