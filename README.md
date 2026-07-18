@@ -128,6 +128,36 @@ The renewal script renews via the DNS-01 challenge, imports the new certificate 
 
 > **After any FileMaker Server upgrade**, re-verify that the DNS-01 scripts in `Tools/Lets_Encrypt/` were not overwritten by Claris's default HTTP-01 versions — a server upgrade can restore the stock scripts. Re-download from this repo if needed.
 
+## Monitoring certificate expiry (healthchecks.io reminder) ##
+
+Because these certificates renew **manually** (see above), the safety net is a reminder that nags you when one is approaching expiry. `cert_expiry_healthcheck.sh` provides this using [healthchecks.io](https://healthchecks.io) as an external dead-man's-switch.
+
+**How it works — active probe, not ping-on-renewal.** A daily cron reads the *live* certificate expiry straight off the wire (`openssl s_client`) and pings a healthchecks.io check **only while more than `THRESHOLD_DAYS` (default 14) remain**. When the certificate nears expiry — **or** a renewal has silently failed, **or** the certificate can't be read at all — the ping is withheld, so healthchecks.io alerts after its grace window. That means the alert tracks the *real* cert state on the wire rather than trusting a human to remember to ping on a successful renewal (these certs have lapsed under manual handling before, which is exactly why the probe is state-based).
+
+> **Public repo — never commit a real ping URL.** A healthchecks.io ping URL is a secret: anyone who has it can spoof a healthy ping and suppress your alert. The `CERTS` line in this repo copy must keep the `REPLACE-WITH-CHECK-UUID` placeholder. Put the real `hc-ping.com/<uuid>` only in the copy installed on each server.
+
+**Set-up (per server):**
+
+1. In healthchecks.io, create one check per certificate this box serves — schedule type **Period = 1 day, Grace = 3 days** (so ~4 days of silence raises the alert, i.e. it fires at roughly 10 days-to-expiry). Wire the check to your notification channel(s).
+2. Install the script to a clean path and edit its `CERTS` line for this box's domain(s) + the check's ping URL:
+
+```
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/cert_expiry_healthcheck.sh -o /usr/local/sbin/cert_expiry_healthcheck.sh
+sudo chmod 755 /usr/local/sbin/cert_expiry_healthcheck.sh
+sudo nano /usr/local/sbin/cert_expiry_healthcheck.sh
+```
+
+The `CERTS` array takes one `"host:port|https://hc-ping.com/<uuid>"` entry per certificate — probe each box against **its own** `:443` so you check the exact certificate being served (this avoids split-horizon DNS resolving the name to a different front-end/cert).
+
+3. Add a daily cron entry and test once (the check should flip green):
+
+```
+echo '23 7 * * * root /usr/local/sbin/cert_expiry_healthcheck.sh' | sudo tee /etc/cron.d/cert-healthcheck
+sudo /usr/local/sbin/cert_expiry_healthcheck.sh && journalctl -t cert-healthcheck -n 5
+```
+
+`THRESHOLD_DAYS` in the script controls how much lead time you get before the reminder trips; raise it for a longer runway.
+
 
 ---------------------------------
 
