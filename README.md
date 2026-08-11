@@ -3,6 +3,8 @@
 
 Workspace to house scripts for generating SSL Certificates for FileMaker Server instances.
 
+> **Scope note.** This repo started SSL-only and has grown a second role: it also carries the small **fleet monitoring** scripts behind the healthchecks.io watchdog — `cert_expiry_healthcheck.sh` (certificate expiry) and `hc-heartbeat.sh` (box heartbeat). The heartbeat is deliberately generic and is installed on boxes running no FileMaker at all (PBS, unRAID). The repo name is kept as-is because it is baked into the install URLs below and into the runbooks that use them.
+
 Scripts modified from source provided by Claris as part of the standard installation contained in '/opt/FileMaker/FileMaker Server/Tools/Lets_Encrypt
 
 Primary modifications are to enable request & renewal of certificates via 'DNS-01 Challenge' rather than the 'HTTP-01 Challenge' which is currently the default (and only) option.
@@ -157,6 +159,39 @@ sudo /usr/local/sbin/cert_expiry_healthcheck.sh && journalctl -t cert-healthchec
 ```
 
 `THRESHOLD_DAYS` in the script controls how much lead time you get before the reminder trips; raise it for a longer runway.
+
+## Box heartbeat (healthchecks.io) ##
+
+`hc-heartbeat.sh` is the other half of the same watchdog: a daily "I'm alive" ping so that a box which goes **silently** offline is noticed. It is generic and belongs on every box in the fleet, FileMaker or not.
+
+**What it proves:** the box is powered and has outbound internet.
+**What it does not prove:** tailnet health, or that any backup job ran — those are the job success-pings, which are separate checks.
+
+> **A cert check does NOT double as a heartbeat.** The two run different grace windows on purpose: the cert probe uses Grace **3d** so a manual DNS-01 renewal has lead time, while a heartbeat uses Grace **1d** so an outage surfaces in ~48h. The 3d grace cannot be tightened without reintroducing false cert alarms, so one check cannot serve both latencies. Boxes running both scripts need both checks.
+
+> **Public repo — never commit a real ping URL.** As with the cert script, the `PING_URL` line in this repo copy must keep its `PASTE_HEALTHCHECKS_PING_URL_HERE` placeholder. The script refuses to run while the placeholder is still in place, rather than silently pinging nothing.
+
+**Set-up (per box):**
+
+1. In healthchecks.io, create one check for this box — name it `Heartbeat: <box>` using the **tailnet** name, schedule type **Period = 1 day, Grace = 1 day**. Wire it to your notification channel(s).
+2. Install the script and paste this box's ping URL into it:
+
+```
+sudo curl -sSL https://raw.githubusercontent.com/Richyread/FMServer-CloudflareSSL/main/hc-heartbeat.sh -o /usr/local/sbin/hc-heartbeat.sh
+sudo chmod 700 /usr/local/sbin/hc-heartbeat.sh
+sudo nano /usr/local/sbin/hc-heartbeat.sh
+```
+
+Mode **700** rather than 755: the file holds a ping URL, and anyone holding one can spoof a healthy ping and suppress the alert.
+
+3. Add the daily cron stub and test once (the check should flip green):
+
+```
+echo '30 7 * * * root /usr/local/sbin/hc-heartbeat.sh' | sudo tee /etc/cron.d/hc-heartbeat
+sudo /usr/local/sbin/hc-heartbeat.sh && journalctl -t hc-heartbeat -n 5
+```
+
+> **Verify cron accepted the file, not just that the file exists.** A `/etc/cron.d/` entry with any syntax error is discarded **silently and in its entirety** — and because the manual test above turns the check green, healthchecks.io will look correct while nothing is scheduled. Confirm with `journalctl -u cron -n 20`, which should log a `RELOAD` for the file and no `Error: bad minute`. The most common cause is a pasted comment line wrapping into a second line that cron then reads as a broken schedule; keep every line in `/etc/cron.d/` short.
 
 
 ---------------------------------
