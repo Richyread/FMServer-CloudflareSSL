@@ -1,0 +1,9 @@
+# macOS Finder noise
+.DS_Store
+
+# Never commit certificate material or secrets.
+# cloudflare.ini is deliberately NOT listed: it is tracked as a template and
+# carries a placeholder token, never a live one.
+*.key
+*.pem
+.env
